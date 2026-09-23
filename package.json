@@ -1,0 +1,42 @@
+{
+  "name": "pi-ark-usage",
+  "version": "0.1.0",
+  "description": "Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI via arkcli",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "extension",
+    "volcengine",
+    "ark",
+    "arkcli",
+    "coding-plan",
+    "usage",
+    "quota",
+    "tui"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "extensions",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=23.6"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "main": "extensions/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.19",
+    "typescript": "^5.9.3"
+  }
+}
