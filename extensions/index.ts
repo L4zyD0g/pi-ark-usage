@@ -78,7 +78,7 @@ type Status = "ok" | "fetching" | "failed" | "none";
 
 /* --------------------------------- state ---------------------------------- */
 
-let language: Language = "zh";
+let language: Language = "en";
 const snapshots = new Map<string, PlanSnapshot>();
 let activeProduct: ProductId | null = null;
 let status: Status = "ok";
@@ -537,16 +537,16 @@ export default function (pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("arkcheck", {
-    description: "强制刷新火山引擎套餐用量",
+    description: "Force refresh Volcengine Ark plan usage",
     handler: cmdCheck,
   });
   pi.registerCommand("arkusage", {
-    description: "查看火山引擎套餐用量详情",
+    description: "Show Volcengine Ark plan usage details",
     handler: cmdUsage,
   });
   pi.registerCommand("arkset", {
     description:
-      "查看/设置用量插件：yellow|red|auto|product|seat|lang|reset",
+      "View/change ark usage settings: yellow|red|auto|product|seat|lang|reset",
     handler: cmdSet,
   });
 }

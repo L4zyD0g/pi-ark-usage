@@ -93,7 +93,7 @@ const EN: Locale = {
   using: "using",
   changed: "changed",
   reset: "reset",
-  resetsIn: (t) => `resets in ${t}`,
+  resetsIn: (t) => `reset after ${t}`,
   ageNow: "now",
   ageMinutesAgo: (m) => `${m}m ago`,
   ageHoursAgo: (h, m) => (m > 0 ? `${h}h${m}m ago` : `${h}h ago`),

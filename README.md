@@ -3,7 +3,7 @@
 在 pi TUI 中显示**火山引擎方舟 Coding Plan / Agent Plan** 的套餐用量，数据来自 [`arkcli`](https://www.volcengine.com/docs/82379) 的 `arkcli usage plan`。
 
 ```
-火山用量: 会话 30%(4h18m后重置) / 周 37%(4天后重置) / 月 19%(29天后重置)        刚刚
+Volc Usage: sess 30%(reset after 4h18m) / wk 37%(reset after 4d) / mo 19%(reset after 29d)        now
 ```
 
 ## 特性
@@ -66,7 +66,7 @@ pi install npm:pi-ark-usage
 | `/arkset auto <分钟>` | 空闲自动刷新间隔，0–30 的整数，`0` 关闭（默认关闭） |
 | `/arkset product <id>` | 固定查询的产品：`auto`（默认）/ `coding-plan` / `agent-plan` / `coding-plan-team` / `agent-plan-team` |
 | `/arkset seat <id>` | 团队版指定 SeatID；`/arkset seat none` 清除 |
-| `/arkset lang <zh\|en>` | 界面语言，默认中文 |
+| `/arkset lang <zh\|en>` | UI language, default English |
 | `/arkset reset` | 恢复全部默认设置 |
 
 ### 产品选择规则
