@@ -1,14 +1,14 @@
 {
   "name": "pi-ark-usage",
   "version": "0.1.0",
-  "description": "Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI via arkcli",
+  "description": "Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI (AK/SK OpenAPI)",
   "keywords": [
     "pi",
     "pi-package",
     "extension",
     "volcengine",
     "ark",
-    "arkcli",
+    "openapi",
     "coding-plan",
     "usage",
     "quota",
@@ -38,5 +38,8 @@
   "devDependencies": {
     "@types/node": "^22.19.19",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@volcengine/openapi": "^1.36.2"
   }
 }

@@ -27,14 +27,14 @@ export type ArkSettings = {
 
 export type PeriodLabel = "session" | "5h" | "weekly" | "monthly";
 
-/** One billing period as returned by `arkcli usage plan`. */
+/** One billing period as returned by the Ark usage API. */
 export type ArkPeriod = {
   label: PeriodLabel | string;
   percent: number;
   reset_at?: string;
 };
 
-/** One product entry as returned by `arkcli usage plan`. */
+/** One product entry in a usage snapshot. */
 export type ArkPlanItem = {
   product: string;
   edition: "personal" | "team" | string;
@@ -44,7 +44,7 @@ export type ArkPlanItem = {
   updated_at?: number;
 };
 
-/** Shape of `arkcli usage plan --format json` output. */
+/** Shape of the normalized usage-fetch output. */
 export type ArkPlanOutput = {
   viewer?: {
     auth_method?: string;

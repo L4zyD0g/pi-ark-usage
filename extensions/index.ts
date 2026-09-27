@@ -1,9 +1,10 @@
 /**
  * pi-ark-usage
  *
- * Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI via
- * `arkcli usage plan`. Auth is fully handled by arkcli itself; this extension
- * never sees API keys.
+ * Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI, fetched
+ * directly from the Ark OpenAPI (`GetCodingPlanUsage`) with AK/SK signing via
+ * the official `@volcengine/openapi` Signer. This extension never stores keys:
+ * credentials come from VOLC_ACCESSKEY/VOLC_SECRETKEY or ~/.volc/config.
  *
  * Widget (below editor): 火山用量: 会话 4%(...) / 周 34%(...) / 月 17%(...)
  * Commands:
@@ -59,7 +60,7 @@ const PRODUCTS = [
 
 type ProductId = (typeof PRODUCTS)[number];
 
-/** provider id (pi models.json) -> arkcli product id */
+/** provider id (pi models.json) -> plan product id */
 const PROVIDER_PRODUCT: Record<string, ProductId> = {
   "coding-plan": "coding-plan",
   "agent-plan": "agent-plan",
