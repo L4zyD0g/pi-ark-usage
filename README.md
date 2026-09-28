@@ -67,7 +67,7 @@ pi install npm:pi-ark-usage
 |---|---|
 | `/arkset yellow <n>` | 黄色阈值（百分比，默认 40），须低于红线 |
 | `/arkset red <n>` | 红色阈值（百分比，默认 80），须高于黄线 |
-| `/arkset auto <分钟>` | 空闲自动刷新间隔，0–30 的整数，`0` 关闭（默认关闭） |
+| `/arkset auto <分钟>` | 空闲自动刷新间隔，0–30 的整数，`0` 关闭（默认 5 分钟） |
 | `/arkset product <id>` | 展示映射的产品：`auto`（默认）/ `coding-plan` / `agent-plan` / `coding-plan-team` / `agent-plan-team` |
 | `/arkset seat <id>` | 团队版指定 SeatID；`/arkset seat none` 清除 |
 | `/arkset lang <zh\|en>` | UI language, default English |
@@ -89,7 +89,9 @@ pi install npm:pi-ark-usage
 | `agent_start` | 建立本轮基线（缓存 1 小时内有效；否则限时 3 秒补抓，超时沿用缓存） |
 | `agent_settled` | 本轮结算抓取，并与基线对比标注消耗 |
 | `/arkcheck` | 手动强制刷新 |
-| 可选自动刷新 | 仅当 `/arkset auto` 开启时按间隔执行 |
+| 可选自动刷新 | 默认每 5 分钟（`/arkset auto` 可调 0–30，`0` 关闭） |
+
+> 注意：`auto` 设置会持久化到磁盘 cache；旧版本用户若曾显式设过 `0`，升级后仍是关闭，需手动 `/arkset auto 5` 开启。
 
 ## 工作原理
 

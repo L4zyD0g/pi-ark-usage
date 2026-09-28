@@ -36,6 +36,7 @@ import {
   flushWrites,
   loadCache,
   markShuttingDown,
+  resetShutdownState,
   saveCache,
 } from "./lib/cache.js";
 import type {
@@ -504,15 +505,26 @@ export default function (pi: ExtensionAPI): void {
     }
   }
 
-  pi.on("session_shutdown", async () => {
-    shuttingDown = true;
-    markShuttingDown();
+  pi.on("session_shutdown", async (event) => {
     stopTicker();
     inFlight?.abort();
+    // Only a real quit is terminal. Session switches (/new, /resume, /fork,
+    // /reload) tear down and then re-enter session_start in the same process;
+    // marking terminal shutdown there would block every future refresh.
+    if (event.reason === "quit") {
+      shuttingDown = true;
+      markShuttingDown();
+    }
     await flushWrites();
   });
 
   pi.on("session_start", (_event, ctx) => {
+    // Session switches reuse this module instance in-process: pi has disposed
+    // the old TUI widget and torn down the previous runtime, so drop stale
+    // handles and revive the shutdown flags before doing anything else.
+    shuttingDown = false;
+    resetShutdownState();
+    activeWidget = null;
     activeProduct = resolveProduct(ctx);
     deltas = null;
     note = null;

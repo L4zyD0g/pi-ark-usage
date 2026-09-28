@@ -1,6 +1,6 @@
 {
   "name": "pi-ark-usage",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI (AK/SK OpenAPI)",
   "keywords": [
     "pi",
@@ -33,7 +33,8 @@
   },
   "main": "extensions/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ./test/ts-resolve-hook.mjs --test --experimental-strip-types test/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

@@ -124,7 +124,7 @@ export const AUTO_REFRESH_MAX_MINUTES = 30;
 export const DEFAULT_SETTINGS: ArkSettings = {
   pctYellow: 40,
   pctRed: 80,
-  autoRefreshMinutes: 0,
+  autoRefreshMinutes: 5,
   product: "auto",
   seat: "",
 };

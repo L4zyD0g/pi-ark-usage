@@ -172,6 +172,11 @@ export function markShuttingDown(): void {
   shuttingDown = true;
 }
 
+/** Revive cache writes after an in-process session switch (see index.ts). */
+export function resetShutdownState(): void {
+  shuttingDown = false;
+}
+
 async function writeFile(data: string): Promise<void> {
   await mkdir(CACHE_DIR, { recursive: true, mode: DIR_MODE });
   const dir = await lstat(CACHE_DIR);
