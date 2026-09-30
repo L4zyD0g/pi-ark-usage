@@ -38,12 +38,14 @@ export function makeMockPi() {
 
 export const minimalTheme = new Proxy(
   {},
-  { get: (_t, prop) => (text) => `[${String(prop)}]${text}` },
+  // Theme.fg(color, text) — forward both args like the real implementation.
+  { get: (_t, prop) => (color, text) => `[${String(prop)}]${text ?? color}` },
 );
 
 export function makeMockCtx() {
   const widgets = [];
   const notifications = [];
+  const statuses = new Map();
   const ctx = {
     model: { provider: "coding-plan", id: "test-model" },
     isIdle: () => true,
@@ -52,12 +54,17 @@ export function makeMockCtx() {
         // pi invokes the factory immediately (see setExtensionWidget).
         widgets.push(factory({ requestRender() {} }, minimalTheme));
       },
+      setStatus(key, text) {
+        if (text === undefined) statuses.delete(key);
+        else statuses.set(key, text);
+      },
+      theme: minimalTheme,
       notify(msg) {
         notifications.push(msg);
       },
     },
   };
-  return { ctx, widgets, notifications };
+  return { ctx, widgets, notifications, statuses };
 }
 
 /** Stub the Ark OpenAPI endpoint with a valid GetCodingPlanUsage payload. */

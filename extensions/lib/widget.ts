@@ -122,7 +122,7 @@ export const LOCALES: Record<Language, Locale> = { zh: ZH, en: EN };
 export const AUTO_REFRESH_MAX_MINUTES = 30;
 
 export const DEFAULT_SETTINGS: ArkSettings = {
-  pctYellow: 40,
+  pctYellow: 50,
   pctRed: 80,
   autoRefreshMinutes: 5,
   product: "auto",
@@ -207,6 +207,57 @@ export function formatAge(fetchedAt: number, lang: Language): string {
   if (d > 0) return LOCALES[lang].ageDaysAgo(d, h % 24);
   if (h > 0) return LOCALES[lang].ageHoursAgo(h, m);
   return LOCALES[lang].ageMinutesAgo(m);
+}
+
+/* ---------------------- compact status (powerline slot) -------------------- */
+
+/**
+ * Compact reset countdown for the powerline status: `38m`, `4h38m`, `5d4h`.
+ * Lower-precision units are dropped to keep the line short and stable.
+ */
+export function formatCompactRemaining(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "";
+  const totalMin = Math.floor(ms / 60_000);
+  const d = Math.floor(totalMin / 1440);
+  const h = Math.floor((totalMin % 1440) / 60);
+  const m = totalMin % 60;
+  if (d > 0) return `${d}d${h}h`;
+  if (h > 0) return `${h}h${m}m`;
+  return `${m}m`;
+}
+
+/**
+ * One-line colored summary for the powerline extension-status slot:
+ * `1% 4h38m | 15% 5d4h | 54% 23d4h`
+ *
+ * Periods are shown in API order (session / weekly / monthly) without
+ * labels — the order itself is the convention. Percent follows the
+ * yellow/red thresholds (green below yellow, yellow below red, red at/above
+ * red); the time part is always purple; the ` | ` separator uses the
+ * editor border color (`thinkingHigh`, pink in the dark theme).
+ *
+ * Returns null when nothing should be shown (the powerline item hides).
+ */
+export function buildCompactStatus(
+  snapshot: PlanSnapshot | null,
+  status: WidgetStatus,
+  theme: Theme,
+): string | null {
+  if (snapshot && snapshot.periods.length > 0) {
+    const sep = theme.fg("thinkingHigh", " | ");
+    return snapshot.periods
+      .map((p) => {
+        const pct = coloredPct(clampPct(p.percent));
+        const reset = p.reset_at
+          ? formatCompactRemaining(new Date(p.reset_at).getTime() - Date.now())
+          : "";
+        return reset ? `${pct} ${hexFg(HEX_COLORS.purple, reset)}` : pct;
+      })
+      .join(sep);
+  }
+  if (status === "fetching") return hexFg(HEX_COLORS.purple, "…");
+  if (status === "failed") return hexFg(HEX_COLORS.red, "failed");
+  return null;
 }
 
 /* ----------------------------- snapshot -> items --------------------------- */

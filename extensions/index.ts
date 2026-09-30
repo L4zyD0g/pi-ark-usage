@@ -26,6 +26,7 @@ import {
   ArkUsageComponent,
   AUTO_REFRESH_MAX_MINUTES,
   LOCALES,
+  buildCompactStatus,
   buildItems,
   formatRemaining,
   getSettings,
@@ -48,6 +49,8 @@ import type {
 } from "./lib/types.js";
 
 const WIDGET_KEY = "pi-ark-usage";
+/** Extension-status key consumed by pi-powerline-footer (powerline slot). */
+const STATUS_KEY = "ark-usage";
 const TICK_MS = 60_000;
 const AGENT_START_TIMEOUT_MS = 3_000;
 const BASELINE_FRESH_MS = 60 * 60_000;
@@ -128,14 +131,24 @@ function activeSnapshot(): PlanSnapshot | null {
 function renderWidget(ctx: ExtensionContext): void {
   lastCtx = ctx;
   const snap = activeSnapshot();
+  const widgetStatus = status === "ok" && !snap ? "none" : status;
   const items: RenderItem[] = buildItems(
     snap,
     language,
-    status === "ok" && !snap ? "none" : status,
+    widgetStatus,
     ctx.isIdle(),
     deltas,
     note,
   );
+  // Publish the one-line summary to the extension-status slot (powerline).
+  // The ticker calls renderWidget every minute while idle, keeping the
+  // reset countdown fresh without refetching.
+  const compact = buildCompactStatus(snap, widgetStatus, ctx.ui.theme);
+  if (compact) {
+    ctx.ui.setStatus(STATUS_KEY, compact);
+  } else {
+    ctx.ui.setStatus(STATUS_KEY, undefined);
+  }
   if (activeWidget) {
     activeWidget.update(items);
     return;
