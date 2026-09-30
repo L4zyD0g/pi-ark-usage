@@ -4,13 +4,6 @@
 
 export type Language = "zh" | "en";
 
-/** Render model, modeled after pi-check-agent-quota. */
-export type RenderItem =
-  | { kind: "text"; text: string }
-  | { kind: "pct"; pct: number; metric: string }
-  | { kind: "annotation"; text: string }
-  | { kind: "age"; text: string };
-
 /** User-tunable settings (persisted in the disk cache). */
 export type ArkSettings = {
   /** yellow threshold, percent */

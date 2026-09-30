@@ -6,14 +6,11 @@
  * the official `@volcengine/openapi` Signer. This extension never stores keys:
  * credentials come from VOLC_ACCESSKEY/VOLC_SECRETKEY or ~/.volc/config.
  *
- * Widget (below editor): 火山用量: 会话 4%(...) / 周 34%(...) / 月 17%(...)
+ * Powerline status (via `ctx.ui.setStatus`): 1% 4h38m | 15% 5d4h | 54% 23d4h
  * Commands:
  *   /arkcheck          force refresh
  *   /arkusage          show snapshot in a notification
  *   /arkset ...        view/change settings
- *
- * Design modeled after pi-check-agent-quota: baseline snapshot taken at
- * agent_start, compared at agent_settled to annotate per-round consumption.
  */
 
 import type {
@@ -23,11 +20,9 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { fetchPlan } from "./lib/arkcli.js";
 import {
-  ArkUsageComponent,
   AUTO_REFRESH_MAX_MINUTES,
   LOCALES,
   buildCompactStatus,
-  buildItems,
   formatRemaining,
   getSettings,
   patchSettings,
@@ -45,10 +40,8 @@ import type {
   ArkSettings,
   Language,
   PlanSnapshot,
-  RenderItem,
 } from "./lib/types.js";
 
-const WIDGET_KEY = "pi-ark-usage";
 /** Extension-status key consumed by pi-powerline-footer (powerline slot). */
 const STATUS_KEY = "ark-usage";
 const TICK_MS = 60_000;
@@ -87,10 +80,6 @@ let language: Language = "en";
 const snapshots = new Map<string, PlanSnapshot>();
 let activeProduct: ProductId | null = null;
 let status: Status = "ok";
-let deltas: Record<string, number> | null = null;
-let note: "changed" | "reset" | null = null;
-let baseline: PlanSnapshot | null = null;
-let activeWidget: ArkUsageComponent | null = null;
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 let lastCtx: ExtensionContext | null = null;
 let lastAutoAt = 0;
@@ -128,20 +117,12 @@ function activeSnapshot(): PlanSnapshot | null {
 
 /* -------------------------------- rendering -------------------------------- */
 
-function renderWidget(ctx: ExtensionContext): void {
+function renderStatus(ctx: ExtensionContext): void {
   lastCtx = ctx;
   const snap = activeSnapshot();
   const widgetStatus = status === "ok" && !snap ? "none" : status;
-  const items: RenderItem[] = buildItems(
-    snap,
-    language,
-    widgetStatus,
-    ctx.isIdle(),
-    deltas,
-    note,
-  );
   // Publish the one-line summary to the extension-status slot (powerline).
-  // The ticker calls renderWidget every minute while idle, keeping the
+  // The ticker calls renderStatus every minute while idle, keeping the
   // reset countdown fresh without refetching.
   const compact = buildCompactStatus(snap, widgetStatus, ctx.ui.theme);
   if (compact) {
@@ -149,23 +130,6 @@ function renderWidget(ctx: ExtensionContext): void {
   } else {
     ctx.ui.setStatus(STATUS_KEY, undefined);
   }
-  if (activeWidget) {
-    activeWidget.update(items);
-    return;
-  }
-  ctx.ui.setWidget(
-    WIDGET_KEY,
-    (tui, theme) => {
-      const component = new ArkUsageComponent(
-        items,
-        () => theme,
-        () => tui.requestRender?.(),
-      );
-      activeWidget = component;
-      return component;
-    },
-    { placement: "belowEditor" },
-  );
 }
 
 /* --------------------------------- fetching -------------------------------- */
@@ -193,7 +157,7 @@ async function refresh(
   activeProduct = product;
   if (!product) {
     status = "none";
-    renderWidget(ctx);
+    renderStatus(ctx);
     return false;
   }
 
@@ -203,8 +167,7 @@ async function refresh(
   }
 
   status = "fetching";
-  note = null;
-  renderWidget(ctx);
+  renderStatus(ctx);
 
   const controller = new AbortController();
   inFlight = controller;
@@ -242,7 +205,7 @@ async function refresh(
     return false;
   } finally {
     if (inFlight === controller) inFlight = null;
-    renderWidget(ctx);
+    renderStatus(ctx);
   }
 }
 
@@ -252,66 +215,21 @@ function persist(): void {
   saveCache(language, out);
 }
 
-/* ---------------------------- baseline / delta ----------------------------- */
-
-function computeDeltas(
-  before: PlanSnapshot,
-  after: PlanSnapshot,
-): Record<string, number> | null {
-  const out: Record<string, number> = {};
-  for (const p of after.periods) {
-    const old = before.periods.find((q) => q.label === p.label);
-    if (old) out[p.label] = Math.round(old.percent - p.percent);
-    // note: stored as consumed-positive; renderer negates for display
-  }
-  // flip sign convention for renderer: it wants negative=consumed
-  const render: Record<string, number> = {};
-  for (const [k, v] of Object.entries(out)) render[k] = -v;
-  return render;
-}
-
-function looksReset(a: PlanSnapshot, b: PlanSnapshot): boolean {
-  // all periods dropped sharply at once => plan period reset
-  return b.periods.every((p) => {
-    const old = a.periods.find((q) => q.label === p.label);
-    return old !== undefined && p.percent - old.percent < -30;
-  });
-}
+/* ----------------------- session-start / settled --------------------------- */
 
 async function handleStart(ctx: ExtensionContext): Promise<void> {
   const product = resolveProduct(ctx);
   if (!product) return;
   const cached = snapshots.get(product) ?? null;
-  if (cached && Date.now() - cached.fetchedAt <= BASELINE_FRESH_MS) {
-    baseline = cached;
-  } else {
-    const win = await timeoutResult(refresh(ctx, "stale"), AGENT_START_TIMEOUT_MS);
-    baseline = win ? snapshots.get(product) ?? null : cached;
+  // Only refetch at agent_start when the cached snapshot went stale.
+  if (!cached || Date.now() - cached.fetchedAt > BASELINE_FRESH_MS) {
+    await timeoutResult(refresh(ctx, "stale"), AGENT_START_TIMEOUT_MS);
   }
-  deltas = null;
-  renderWidget(ctx);
+  renderStatus(ctx);
 }
 
 async function handleSettled(ctx: ExtensionContext): Promise<void> {
-  const product = resolveProduct(ctx);
-  if (!product) return;
-  const ok = await refresh(ctx, "settled");
-  if (!ok) return;
-  const snap = snapshots.get(product);
-  if (!snap) return;
-
-  if (baseline && baseline.product !== product) {
-    note = "changed";
-    deltas = null;
-  } else if (baseline && looksReset(baseline, snap)) {
-    note = "reset";
-    deltas = null;
-  } else if (baseline) {
-    deltas = computeDeltas(baseline, snap);
-    note = null;
-  }
-  baseline = null;
-  renderWidget(ctx);
+  await refresh(ctx, "settled");
 }
 
 async function timeoutResult<T>(p: Promise<T>, ms: number): Promise<T | null> {
@@ -342,7 +260,7 @@ function ensureTicker(): void {
       return;
     }
     // age text ticks every minute even without refetch
-    if (activeWidget && lastCtx.isIdle()) renderWidget(lastCtx);
+    if (lastCtx && lastCtx.isIdle()) renderStatus(lastCtx);
   }, TICK_MS);
   tickTimer.unref?.();
 }
@@ -408,7 +326,7 @@ async function cmdSet(
   const notifySaved = (): void => {
     persist();
     ctx.ui.notify(locale.settingsApplied, "info");
-    if (lastCtx) renderWidget(lastCtx);
+    if (lastCtx) renderStatus(lastCtx);
   };
 
   if (parts.length === 0) {
@@ -422,7 +340,7 @@ async function cmdSet(
       resetSettings();
       persist();
       ctx.ui.notify(locale.settingsReset, "info");
-      if (lastCtx) renderWidget(lastCtx);
+      if (lastCtx) renderStatus(lastCtx);
       return;
     }
     case "yellow":
@@ -499,7 +417,7 @@ async function cmdSet(
       language = raw;
       persist();
       ctx.ui.notify(locale.languageChanged(language), "info");
-      if (lastCtx) renderWidget(lastCtx);
+      if (lastCtx) renderStatus(lastCtx);
       return;
     }
     default:
@@ -532,25 +450,21 @@ export default function (pi: ExtensionAPI): void {
   });
 
   pi.on("session_start", (_event, ctx) => {
-    // Session switches reuse this module instance in-process: pi has disposed
-    // the old TUI widget and torn down the previous runtime, so drop stale
-    // handles and revive the shutdown flags before doing anything else.
+    // Session switches reuse this module instance in-process: pi has torn
+    // down the previous runtime, so revive the shutdown flags before doing
+    // anything else.
     shuttingDown = false;
     resetShutdownState();
-    activeWidget = null;
     activeProduct = resolveProduct(ctx);
-    deltas = null;
-    note = null;
-    renderWidget(ctx);
+    renderStatus(ctx);
     ensureTicker();
     void refresh(ctx, "session_start");
   });
 
   pi.on("model_select", (_event, ctx) => {
     const next = resolveProduct(ctx);
-    if (baseline && next && baseline.product !== next) note = "changed";
     activeProduct = next;
-    renderWidget(ctx);
+    renderStatus(ctx);
     void refresh(ctx, "model_select");
   });
 

@@ -1,10 +1,11 @@
 /**
- * Rendering: locales, threshold settings, percent coloring, remaining-time
- * formatting, and the TUI Component for the below-editor widget.
+ * Rendering for the powerline extension-status slot: locales, threshold
+ * settings, percent coloring, remaining-time formatting, and the compact
+ * colored one-line summary published via `ctx.ui.setStatus`.
  */
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import type { ArkSettings, Language, PlanSnapshot, RenderItem } from "./types.js";
+import type { ArkSettings, Language, PlanSnapshot } from "./types.js";
 
 /* ---------------------------------- i18n ---------------------------------- */
 
@@ -20,10 +21,6 @@ type Locale = {
   changed: string;
   reset: string;
   resetsIn: (t: string) => string;
-  ageNow: string;
-  ageMinutesAgo: (m: number) => string;
-  ageHoursAgo: (h: number, m: number) => string;
-  ageDaysAgo: (d: number, h: number) => string;
   noActiveProduct: string;
   settingsShow: (s: ArkSettings) => string;
   settingsApplied: string;
@@ -56,10 +53,6 @@ const ZH: Locale = {
   changed: "变更",
   reset: "已重置",
   resetsIn: (t) => `${t}后重置`,
-  ageNow: "刚刚",
-  ageMinutesAgo: (m) => `${m}分钟前`,
-  ageHoursAgo: (h, m) => (m > 0 ? `${h}小时${m}分前` : `${h}小时前`),
-  ageDaysAgo: (d, h) => (h > 0 ? `${d}天${h}小时前` : `${d}天前`),
   noActiveProduct: "当前没有可查询的火山套餐",
   settingsShow: (s) =>
     `当前设置：产品=${s.product} 黄线=${s.pctYellow} 红线=${s.pctRed} 自动刷新=${s.autoRefreshMinutes}分钟 seat=${s.seat || "无"}`,
@@ -94,10 +87,6 @@ const EN: Locale = {
   changed: "changed",
   reset: "reset",
   resetsIn: (t) => `reset after ${t}`,
-  ageNow: "now",
-  ageMinutesAgo: (m) => `${m}m ago`,
-  ageHoursAgo: (h, m) => (m > 0 ? `${h}h${m}m ago` : `${h}h ago`),
-  ageDaysAgo: (d, h) => (h > 0 ? `${d}d${h}h ago` : `${d}d ago`),
   noActiveProduct: "No active Volcengine plan",
   settingsShow: (s) =>
     `Settings: product=${s.product} yellow=${s.pctYellow} red=${s.pctRed} autoRefresh=${s.autoRefreshMinutes}m seat=${s.seat || "none"}`,
@@ -196,19 +185,6 @@ export function formatRemaining(ms: number, lang: Language): string {
   return `${m}m`;
 }
 
-export function formatAge(fetchedAt: number, lang: Language): string {
-  const age = Date.now() - fetchedAt;
-  if (!Number.isFinite(age) || age < 0) return "";
-  if (age < 60_000) return LOCALES[lang].ageNow;
-  const totalMin = Math.floor(age / 60_000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  const d = Math.floor(h / 24);
-  if (d > 0) return LOCALES[lang].ageDaysAgo(d, h % 24);
-  if (h > 0) return LOCALES[lang].ageHoursAgo(h, m);
-  return LOCALES[lang].ageMinutesAgo(m);
-}
-
 /* ---------------------- compact status (powerline slot) -------------------- */
 
 /**
@@ -260,224 +236,5 @@ export function buildCompactStatus(
   return null;
 }
 
-/* ----------------------------- snapshot -> items --------------------------- */
-
+/** Lifecycle states mirrored in the compact status. */
 export type WidgetStatus = "ok" | "fetching" | "failed" | "no-binary" | "none";
-
-export function buildItems(
-  snapshot: PlanSnapshot | null,
-  lang: Language,
-  status: WidgetStatus,
-  isIdle: boolean,
-  /** delta annotations keyed by period label; negative = consumed */
-  deltas: Record<string, number> | null,
-  note?: "changed" | "reset" | null,
-): RenderItem[] {
-  const locale = LOCALES[lang];
-  const items: RenderItem[] = [];
-
-  if (snapshot && snapshot.periods.length > 0) {
-    items.push({ kind: "text", text: `${locale.title}: ` });
-    snapshot.periods.forEach((p, i) => {
-      if (i > 0) items.push({ kind: "text", text: " / " });
-      const label = locale.labels[p.label] ?? p.label;
-      items.push({ kind: "text", text: `${label} ` });
-      items.push({ kind: "pct", pct: clampPct(p.percent), metric: p.label });
-      const delta = deltas?.[p.label];
-      if (typeof delta === "number" && delta !== 0) {
-        const sign = delta > 0 ? "+" : "-";
-        items.push({ kind: "annotation", text: `(${sign}${Math.abs(Math.round(delta))})` });
-      }
-      if (p.reset_at) {
-        const remaining = new Date(p.reset_at).getTime() - Date.now();
-        const t = formatRemaining(remaining, lang);
-        if (t) items.push({ kind: "annotation", text: `(${locale.resetsIn(t)})` });
-      }
-    });
-  } else if (status === "fetching") {
-    items.push({ kind: "text", text: `${locale.title}: ` });
-    items.push({ kind: "annotation", text: locale.fetching });
-  } else if (status === "failed") {
-    items.push({ kind: "text", text: `${locale.title}: ` });
-    items.push({ kind: "annotation", text: locale.failed });
-  } else if (status === "no-binary") {
-    items.push({ kind: "annotation", text: locale.noBinary });
-  } else {
-    items.push({ kind: "annotation", text: locale.noData });
-  }
-
-  if (!isIdle) {
-    items.push({ kind: "annotation", text: ` (${locale.using})` });
-  } else if (note) {
-    items.push({ kind: "annotation", text: ` (${note === "reset" ? locale.reset : locale.changed})` });
-  }
-
-  if (snapshot) {
-    items.push({ kind: "age", text: formatAge(snapshot.fetchedAt, lang) });
-  }
-  return items;
-}
-
-export function formatItems(items: RenderItem[], theme: Theme): string {
-  return items
-    .map((it) => {
-      switch (it.kind) {
-        case "text":
-          return theme.fg("dim", it.text);
-        case "pct":
-          return coloredPct(it.pct);
-        case "age":
-          return theme.fg("dim", it.text);
-        case "annotation":
-        default:
-          return hexFg(HEX_COLORS.purple, it.text);
-      }
-    })
-    .join("");
-}
-
-/* ------------------------------ ansi helpers ------------------------------ */
-
-export const ANSI_RE = /\x1b\[[0-9;]*m/g;
-
-export function visibleWidth(s: string): number {
-  let w = 0;
-  for (const ch of s.replace(ANSI_RE, "")) {
-    const cp = ch.codePointAt(0) ?? 0;
-    if (cp === 0x200d || (cp >= 0xfe00 && cp <= 0xfe0f)) continue;
-    if (cp >= 0x0300 && cp <= 0x036f) continue;
-    w +=
-      (cp >= 0x1100 && cp <= 0x115f) ||
-      (cp >= 0x2e80 && cp <= 0xa4cf) ||
-      (cp >= 0xac00 && cp <= 0xd7a3) ||
-      (cp >= 0xf900 && cp <= 0xfaff) ||
-      (cp >= 0xfe30 && cp <= 0xfe6f) ||
-      (cp >= 0xff00 && cp <= 0xff60) ||
-      (cp >= 0xffe0 && cp <= 0xffe6) ||
-      (cp >= 0x1f300 && cp <= 0x1f9ff)
-        ? 2
-        : 1;
-  }
-  return w;
-}
-
-export function truncateAnsi(s: string, maxWidth: number): string {
-  if (maxWidth <= 0) return "";
-  if (visibleWidth(s) <= maxWidth) return s;
-  const budget = maxWidth - 1;
-  let out = "";
-  let w = 0;
-  let i = 0;
-  while (i < s.length) {
-    ANSI_RE.lastIndex = i;
-    const m = ANSI_RE.exec(s);
-    if (m && m.index === i) {
-      out += m[0];
-      i = ANSI_RE.lastIndex;
-      continue;
-    }
-    const ch = String.fromCodePoint(s.codePointAt(i) ?? 0);
-    const cw = visibleWidth(ch);
-    if (w + cw > budget) break;
-    out += ch;
-    w += cw;
-    i += ch.length;
-  }
-  return `${out}…\x1b[0m`;
-}
-
-export function itemsEqual(a: RenderItem[], b: RenderItem[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((it, i) => {
-    const o = b[i];
-    if (it.kind !== o.kind) return false;
-    switch (it.kind) {
-      case "pct":
-        return (
-          o.kind === "pct" && it.pct === o.pct && it.metric === o.metric
-        );
-      case "text":
-        return o.kind === "text" && it.text === o.text;
-      case "age":
-        return o.kind === "age" && it.text === o.text;
-      case "annotation":
-        return o.kind === "annotation" && it.text === o.text;
-    }
-  });
-}
-
-/* -------------------------------- component -------------------------------- */
-
-export interface Component {
-  render(width: number): string[];
-  invalidate(): void;
-  dispose?(): void;
-}
-
-/**
- * Widget rendered below the editor. The age segment is right-aligned and the
- * content wraps to two lines when the terminal is too narrow.
- */
-export class ArkUsageComponent implements Component {
-  private items: RenderItem[];
-  private readonly themeRef: () => Theme;
-  private readonly requestRender: () => void;
-  private cache: { width: number; lines: string[] } | null = null;
-  private disposed = false;
-
-  constructor(
-    items: RenderItem[],
-    themeRef: () => Theme,
-    requestRender: () => void,
-  ) {
-    this.items = items;
-    this.themeRef = themeRef;
-    this.requestRender = requestRender;
-  }
-
-  update(items: RenderItem[]): void {
-    if (this.disposed || itemsEqual(this.items, items)) return;
-    this.items = items;
-    this.invalidate();
-    this.requestRender();
-  }
-
-  invalidate(): void {
-    this.cache = null;
-  }
-
-  render(width: number): string[] {
-    if (this.cache && this.cache.width === width) return this.cache.lines;
-    const theme = this.themeRef();
-
-    const ageIdx = this.items.findIndex((it) => it.kind === "age");
-    if (ageIdx === -1) {
-      const text = formatItems(this.items, theme);
-      const lines = text ? [truncateAnsi(text, width)] : [];
-      this.cache = { width, lines };
-      return lines;
-    }
-
-    const leftText = formatItems(this.items.slice(0, ageIdx), theme);
-    const rightText = formatItems(this.items.slice(ageIdx), theme);
-    const lw = visibleWidth(leftText);
-    const rw = visibleWidth(rightText);
-
-    let lines: string[];
-    if (lw + rw + 1 <= width) {
-      lines = [leftText + " ".repeat(width - lw - rw) + rightText];
-    } else {
-      lines = [
-        leftText ? truncateAnsi(leftText, width) : "",
-        rw <= width ? " ".repeat(Math.max(0, width - rw)) + rightText : truncateAnsi(rightText, width),
-      ].filter((l) => l !== "");
-    }
-    this.cache = { width, lines };
-    return lines;
-  }
-
-  dispose(): void {
-    this.disposed = true;
-    this.cache = null;
-  }
-}

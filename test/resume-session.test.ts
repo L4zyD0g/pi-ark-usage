@@ -1,4 +1,4 @@
-/** Regression: after `/resume` the widget must be re-registered and refresh must resume. */
+/** Regression: after `/resume` the status must be re-published and refresh must resume. */
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -20,7 +20,7 @@ describe("/resume session switch", () => {
   });
   afterEach(() => restoreFetch());
 
-  it("re-registers the widget and keeps fetching after /resume", async () => {
+  it("re-publishes status and keeps fetching after /resume", async () => {
     const api = makeMockPi();
     createExtension(api);
 
@@ -32,7 +32,8 @@ describe("/resume session switch", () => {
 
     const s2 = makeMockCtx();
     await api.fire("session_start", { type: "session_start", reason: "resume" }, s2.ctx);
-    assert.equal(s2.widgets.length, 1, "widget re-registered on the resumed session's TUI");
+    await waitFor(() => (s2.statuses.get("ark-usage") ?? "").includes("|"),
+      "status re-published on the resumed session");
 
     const before = counter.count;
     await api.fire("agent_settled", { type: "agent_settled" }, s2.ctx);

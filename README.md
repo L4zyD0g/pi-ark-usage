@@ -10,10 +10,8 @@ Volc Usage: sess 30%(reset after 4h18m) / wk 37%(reset after 4d) / mo 19%(reset 
 
 - **AK/SK 直连 OpenAPI**：不走子进程、不依赖 SSO 登录态；凭据只从环境变量或配置文件读取，本扩展不保存、不上传任何 Key
 - **三个周期同屏**：session（会话）/ weekly（周）/ monthly（月），并显示各周期重置倒计时
-- **Powerline 状态段**：通过 `ctx.ui.setStatus("ark-usage", …)` 发布单行摘要（`1% 4h38m | 15% 5d4h | 54% 23d4h`，固定按 session/weekly/monthly 顺序），可直接显示在 [pi-powerline-footer](https://www.npmjs.com/package/pi-powerline-footer) 的 `extension_statuses` / customItems 上；百分比按阈值绿/黄/红着色，时间部分紫色，分隔符跟随主题 `thinkingHigh`（编辑器边框色）
+- **Powerline 状态段（唯一展示位）**：通过 `ctx.ui.setStatus("ark-usage", …)` 发布单行摘要（`1% 4h38m | 15% 5d4h | 54% 23d4h`，固定按 session/weekly/monthly 顺序），显示在 [pi-powerline-footer](https://www.npmjs.com/package/pi-powerline-footer) 上；百分比按阈值绿/黄/红着色，时间部分紫色，分隔符跟随主题 `thinkingHigh`（编辑器边框色）。不安装 powerline 时也可通过内置 footer 的 extension statuses 区域或 `/arkusage` 查看
 - **阈值着色**：低用量绿色（<50%）、接近上限黄色（50–79%）、超过红线红色（≥80%，默认值，可用 `/arkset` 调整）
-- **单轮消耗**：以每轮对话开始前的快照为基线，结算时标注各周期增量（如 `(+2)`）
-- **产品切换感知**：在个人版/团队版、Coding Plan/Agent Plan 之间切换时标注 `(变更)`；套餐周期重置时标注 `(已重置)`
 - **持久化缓存**：重启 pi 后立即显示上次快照（`~/.pi/agent/pi-ark-usage/cache.json`，0600 权限，临时文件原子写入）
 - 可选空闲自动刷新（默认关闭）
 
@@ -99,7 +97,7 @@ pi install npm:pi-ark-usage
 1. 用官方 `@volcengine/openapi` 的 `Signer` 对 `POST open.volcengineapi.com?Action=GetCodingPlanUsage&Version=2024-01-01`（service `ark`，region `cn-beijing`）做 V4 签名后 fetch。
 2. 解析 `Result.QuotaUsage[]`（`Level/Percent/ResetTimestamp`，秒级时间戳转 `+08:00` ISO 字符串），做结构与取值校验。
 3. 快照存入内存 Map，并以原子写（tmp 文件 + rename）持久化到 `~/.pi/agent/pi-ark-usage/`。
-4. Widget 通过 `ctx.ui.setWidget(..., { placement: "belowEditor" })` 渲染在编辑器下方；age（抓取于多久前）右对齐，终端过窄时自动折成两行。
+4. 摘要通过 `ctx.ui.setStatus("ark-usage", …)` 发布到 extension status，由 pi-powerline-footer 渲染到 powerline 行；每分钟 ticker 在空闲时重发，保持重置倒计时刷新。
 
 ## 开发
 
