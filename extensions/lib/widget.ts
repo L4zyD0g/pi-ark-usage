@@ -203,8 +203,24 @@ export function formatCompactRemaining(ms: number): string {
 }
 
 /**
+ * Age of the last successful refresh, for the trailing status segment:
+ * `just now`, `3m ago`, `4h38m ago`, `5d4h ago`. Minute is the finest unit —
+ * seconds would only make the line jitter — and a stale cached snapshot thus
+ * reads as old at a glance.
+ */
+export function formatRefreshAgo(ts: number, now: number = Date.now()): string {
+  if (!Number.isFinite(ts) || ts <= 0) return "";
+  const ms = now - ts;
+  // Clock skew can make a fresh fetch look negative; treat it as "now".
+  if (ms < 60_000) return "just now";
+  // Drop a zero lower unit (`1h0m` -> `1h`, `5d0h` -> `5d`).
+  const age = formatCompactRemaining(ms).replace(/([dh])0[mh]$/, "$1");
+  return `${age} ago`;
+}
+
+/**
  * One-line colored summary for the powerline extension-status slot:
- * `1% 4h38m | 15% 5d4h | 54% 23d4h`
+ * `1% 4h38m | 15% 5d4h | 54% 23d4h | 3m ago`
  *
  * Periods are shown in API order (session / weekly / monthly) without
  * labels — the order itself is the convention. Percent follows the
@@ -212,24 +228,32 @@ export function formatCompactRemaining(ms: number): string {
  * red); the time part is always purple; the ` | ` separator uses the
  * editor border color (`thinkingHigh`, pink in the dark theme).
  *
+ * The last segment is how long ago the data was fetched, in `dim` — it is
+ * meta information, not usage, so it stays visually secondary.
+ *
  * Returns null when nothing should be shown (the powerline item hides).
  */
 export function buildCompactStatus(
   snapshot: PlanSnapshot | null,
   status: WidgetStatus,
   theme: Theme,
+  now: number = Date.now(),
 ): string | null {
   if (snapshot && snapshot.periods.length > 0) {
     const sep = theme.fg("thinkingHigh", " | ");
-    return snapshot.periods
+    const periods = snapshot.periods
       .map((p) => {
         const pct = coloredPct(clampPct(p.percent));
         const reset = p.reset_at
-          ? formatCompactRemaining(new Date(p.reset_at).getTime() - Date.now())
+          ? formatCompactRemaining(new Date(p.reset_at).getTime() - now)
           : "";
         return reset ? `${pct} ${hexFg(HEX_COLORS.purple, reset)}` : pct;
       })
       .join(sep);
+    const refreshed = formatRefreshAgo(snapshot.fetchedAt, now);
+    return refreshed
+      ? `${periods}${sep}${theme.fg("dim", refreshed)}`
+      : periods;
   }
   if (status === "fetching") return hexFg(HEX_COLORS.purple, "…");
   if (status === "failed") return hexFg(HEX_COLORS.red, "failed");

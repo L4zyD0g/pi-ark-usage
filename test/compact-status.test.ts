@@ -6,6 +6,7 @@ import { makeMockCtx } from "./helpers.ts";
 const {
   buildCompactStatus,
   formatCompactRemaining,
+  formatRefreshAgo,
   coloredPct,
   hexFg,
   HEX_COLORS,
@@ -19,9 +20,15 @@ const theme = {
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+const MIN = 60_000;
 
-function snapOf(periods) {
-  return { product: "coding-plan", edition: "personal", fetchedAt: Date.now(), periods };
+/** `n` minutes before a fixed clock, for age formatting assertions. */
+function MIN_AGO(n: number): number {
+  return Date.now() - n * MIN;
+}
+
+function snapOf(periods, fetchedAt = Date.now()) {
+  return { product: "coding-plan", edition: "personal", fetchedAt, periods };
 }
 
 describe("formatCompactRemaining", () => {
@@ -39,24 +46,67 @@ describe("formatCompactRemaining", () => {
   });
 });
 
+describe("formatRefreshAgo", () => {
+  it("counts minutes, then hours, then days, dropping zero lower units", () => {
+    assert.equal(formatRefreshAgo(MIN_AGO(3)), "3m ago");
+    assert.equal(formatRefreshAgo(MIN_AGO(10)), "10m ago");
+    assert.equal(formatRefreshAgo(MIN_AGO(59)), "59m ago");
+    assert.equal(formatRefreshAgo(MIN_AGO(60)), "1h ago");
+    assert.equal(formatRefreshAgo(MIN_AGO(4 * 60 + 38)), "4h38m ago");
+    assert.equal(formatRefreshAgo(MIN_AGO(5 * 1440)), "5d ago");
+    assert.equal(formatRefreshAgo(MIN_AGO(5 * 1440 + 4 * 60)), "5d4h ago");
+  });
+
+  it("collapses anything under a minute to 'just now', including clock skew", () => {
+    assert.equal(formatRefreshAgo(MIN_AGO(0)), "just now");
+    assert.equal(formatRefreshAgo(Date.now() - 59_999), "just now");
+    assert.equal(formatRefreshAgo(MIN_AGO(-5)), "just now");
+  });
+
+  it("returns empty for zero/invalid", () => {
+    assert.equal(formatRefreshAgo(0), "");
+    assert.equal(formatRefreshAgo(Number.NaN), "");
+  });
+});
+
 describe("buildCompactStatus", () => {
+  // Fixed clock: buildCompactStatus takes `now` so the countdowns and the
+  // refresh-age segment are fully deterministic in tests.
+  const NOW = new Date(2026, 8, 30, 15, 12).getTime();
+  // 5 minutes before NOW.
+  const FETCHED = new Date(2026, 8, 30, 15, 7).getTime();
+
   it("joins periods in API order (session/weekly/monthly) with colored separator", () => {
     patchSettings({ pctYellow: 50, pctRed: 80 });
-    const now = Date.now();
-    const snap = snapOf([
-      { label: "session", percent: 1, reset_at: now + 4 * HOUR + 39 * 60_000 },
-      { label: "weekly", percent: 15, reset_at: now + 5 * DAY + 4 * HOUR + 60_000 },
-      { label: "monthly", percent: 54, reset_at: now + 23 * DAY + 4 * HOUR + 60_000 },
-    ]);
-    // +1min margin so test-execution delay cannot floor the countdown
-    // into the lower unit (4h39m+ stays 4h38m+; recompute expected below).
+    const snap = snapOf(
+      [
+        { label: "session", percent: 1, reset_at: NOW + 4 * HOUR + 38 * 60_000 },
+        { label: "weekly", percent: 15, reset_at: NOW + 5 * DAY + 4 * HOUR },
+        { label: "monthly", percent: 54, reset_at: NOW + 23 * DAY + 4 * HOUR },
+      ],
+      FETCHED,
+    );
     const expected =
       `${hexFg(HEX_COLORS.green, "1%")} ${hexFg(HEX_COLORS.purple, "4h38m")}` +
       `${theme.fg("thinkingHigh", " | ")}` +
       `${hexFg(HEX_COLORS.green, "15%")} ${hexFg(HEX_COLORS.purple, "5d4h")}` +
       `${theme.fg("thinkingHigh", " | ")}` +
-      `${hexFg(HEX_COLORS.yellow, "54%")} ${hexFg(HEX_COLORS.purple, "23d4h")}`;
-    assert.equal(buildCompactStatus(snap, "ok", theme), expected);
+      `${hexFg(HEX_COLORS.yellow, "54%")} ${hexFg(HEX_COLORS.purple, "23d4h")}` +
+      // trailing segment: separator + age of the last successful refresh, dim
+      `${theme.fg("thinkingHigh", " | ")}${theme.fg("dim", "5m ago")}`;
+    assert.equal(buildCompactStatus(snap, "ok", theme, NOW), expected);
+  });
+
+  it("reports the refresh age across days without extra units", () => {
+    const snap = snapOf(
+      [{ label: "session", percent: 10, reset_at: NOW + 60 * 60_000 }],
+      new Date(2026, 8, 29, 23, 59).getTime(),
+    );
+    assert.equal(
+      buildCompactStatus(snap, "ok", theme, NOW),
+      `${hexFg(HEX_COLORS.green, "10%")} ${hexFg(HEX_COLORS.purple, "1h0m")}` +
+        `${theme.fg("thinkingHigh", " | ")}${theme.fg("dim", "15h13m ago")}`,
+    );
   });
 
   it("applies 50/80 thresholds to the percent color", () => {
@@ -67,11 +117,16 @@ describe("buildCompactStatus", () => {
     assert.equal(coloredPct(80), hexFg(HEX_COLORS.red, "80%"));
   });
 
-  it("omits the time part when reset_at is missing", () => {
-    const snap = snapOf([{ label: "session", percent: 10, reset_at: undefined }]);
+  it("omits the reset countdown when reset_at is missing (keeps refresh age)", () => {
+    const now = new Date(2026, 8, 30, 15, 12).getTime();
+    const snap = snapOf(
+      [{ label: "session", percent: 10, reset_at: undefined }],
+      new Date(2026, 8, 30, 15, 7).getTime(),
+    );
     assert.equal(
-      buildCompactStatus(snap, "ok", theme),
-      `${hexFg(HEX_COLORS.green, "10%")}`,
+      buildCompactStatus(snap, "ok", theme, now),
+      `${hexFg(HEX_COLORS.green, "10%")}` +
+        `${theme.fg("thinkingHigh", " | ")}${theme.fg("dim", "5m ago")}`,
     );
   });
 
@@ -121,6 +176,8 @@ describe("extension status publication", () => {
       assert.match(value, /1%.* \| .*15%.* \| .*54%/);
       // separator went through theme.fg (mock renders as `[fg] | `)
       assert.match(value, /\] \| /);
+      // trailing segment is the age of the last successful refresh
+      assert.match(value, /(just now|\d+[mhd]\w* ago)$/);
     } finally {
       globalThis.fetch = originalFetch;
     }

@@ -6,7 +6,9 @@
  * the official `@volcengine/openapi` Signer. This extension never stores keys:
  * credentials come from VOLC_ACCESSKEY/VOLC_SECRETKEY or ~/.volc/config.
  *
- * Powerline status (via `ctx.ui.setStatus`): 1% 4h38m | 15% 5d4h | 54% 23d4h
+ * Powerline status (via `ctx.ui.setStatus`):
+ *   1% 4h38m | 15% 5d4h | 54% 23d4h | 3m ago
+ * The trailing segment is how long ago the data was last refreshed.
  * Commands:
  *   /arkcheck          force refresh
  *   /arkusage          show snapshot in a notification
