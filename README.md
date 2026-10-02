@@ -10,7 +10,7 @@
 
 - **AK/SK 直连 OpenAPI**：不走子进程、不依赖 SSO 登录态；凭据只从环境变量或配置文件读取，本扩展不保存、不上传任何 Key
 - **三个周期同屏**：session（会话）/ weekly（周）/ monthly（月），并显示各周期重置倒计时
-- **Powerline 状态段（唯一展示位）**：通过 `ctx.ui.setStatus("ark-usage", …)` 发布单行摘要（`1% 4h38m | 15% 5d4h | 54% 23d4h | 3m ago`，固定按 session/weekly/monthly 顺序），显示在 [pi-powerline-footer](https://www.npmjs.com/package/pi-powerline-footer) 上；百分比按阈值绿/黄/红着色，时间部分紫色，分隔符跟随主题 `thinkingHigh`（编辑器边框色），末尾的「上次刷新」用 `dim` 渲染以示区隔。不安装 powerline 时也可通过内置 footer 的 extension statuses 区域或 `/arkusage` 查看
+- **Powerline 状态段（唯一展示位）**：通过 `ctx.ui.setStatus("ark-usage", …)` 发布单行摘要（`1% 4h38m | 15% 5d4h | 54% 23d4h | 3m ago`，固定按 session/weekly/monthly 顺序），显示在 [pi-powerline-footer](https://www.npmjs.com/package/pi-powerline-footer) 上；百分比按阈值绿/黄/红着色，各周期重置倒计时紫色 `#7A5FD0`，` | ` 分隔符与末尾的「上次刷新」统一用粉色 `#D787AF`（与 powerline 模型名段同色）。所有颜色均为固定 hex，不随 pi 主题变化。不安装 powerline 时也可通过内置 footer 的 extension statuses 区域或 `/arkusage` 查看
 - **上次刷新时间**：状态段末尾显示距今多久前**成功**刷新过（分钟精度：`just now` / `3m ago` / `4h38m ago` / `5d4h ago`）。抓取失败时沿用上一次成功的时间，因此该值持续变大即表示刷新已经失败或长时间未刷新
 - **阈值着色**：低用量绿色（<50%）、接近上限黄色（50–79%）、超过红线红色（≥80%，默认值，可用 `/arkset` 调整）
 - **持久化缓存**：重启 pi 后立即显示上次快照（`~/.pi/agent/pi-ark-usage/cache.json`，0600 权限，临时文件原子写入）

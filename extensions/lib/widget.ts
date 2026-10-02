@@ -4,7 +4,6 @@
  * colored one-line summary published via `ctx.ui.setStatus`.
  */
 
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ArkSettings, Language, PlanSnapshot } from "./types.js";
 
 /* ---------------------------------- i18n ---------------------------------- */
@@ -140,7 +139,14 @@ export const HEX_COLORS = {
   green: "#1FA87A",
   yellow: "#F09A3E",
   red: "#EE7A5F",
+  /** Reset countdowns, and the `…` placeholder for a fetch in flight. */
   purple: "#7A5FD0",
+  /**
+   * The ` | ` separators and the trailing refresh age. Kept in sync with the
+   * model-name segment of pi-powerline-footer, whose `model` color is
+   * #d787af, so the separators read as part of the prompt line's palette.
+   */
+  pink: "#D787AF",
 } as const;
 
 export function hexFg(hex: string, text: string): string {
@@ -224,23 +230,23 @@ export function formatRefreshAgo(ts: number, now: number = Date.now()): string {
  *
  * Periods are shown in API order (session / weekly / monthly) without
  * labels — the order itself is the convention. Percent follows the
- * yellow/red thresholds (green below yellow, yellow below red, red at/above
- * red); the time part is always purple; the ` | ` separator uses the
- * editor border color (`thinkingHigh`, pink in the dark theme).
+ * yellow/red thresholds on the used amount (green below yellow, yellow
+ * below red, red at/above red); reset countdowns stay purple; the ` | `
+ * separators and the trailing refresh age are pink (`HEX_COLORS.pink`,
+ * matching the powerline model-name segment).
  *
- * The last segment is how long ago the data was fetched, in `dim` — it is
- * meta information, not usage, so it stays visually secondary.
+ * Every color is a fixed hex value — the slot renders identically in any pi
+ * theme, so `HEX_COLORS` is the only palette this line depends on.
  *
  * Returns null when nothing should be shown (the powerline item hides).
  */
 export function buildCompactStatus(
   snapshot: PlanSnapshot | null,
   status: WidgetStatus,
-  theme: Theme,
   now: number = Date.now(),
 ): string | null {
   if (snapshot && snapshot.periods.length > 0) {
-    const sep = theme.fg("thinkingHigh", " | ");
+    const sep = hexFg(HEX_COLORS.pink, " | ");
     const periods = snapshot.periods
       .map((p) => {
         const pct = coloredPct(clampPct(p.percent));
@@ -252,7 +258,7 @@ export function buildCompactStatus(
       .join(sep);
     const refreshed = formatRefreshAgo(snapshot.fetchedAt, now);
     return refreshed
-      ? `${periods}${sep}${theme.fg("dim", refreshed)}`
+      ? `${periods}${sep}${hexFg(HEX_COLORS.pink, refreshed)}`
       : periods;
   }
   if (status === "fetching") return hexFg(HEX_COLORS.purple, "…");

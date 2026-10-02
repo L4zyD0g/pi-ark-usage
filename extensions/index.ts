@@ -126,7 +126,7 @@ function renderStatus(ctx: ExtensionContext): void {
   // Publish the one-line summary to the extension-status slot (powerline).
   // The ticker calls renderStatus every minute while idle, keeping the
   // reset countdown fresh without refetching.
-  const compact = buildCompactStatus(snap, widgetStatus, ctx.ui.theme);
+  const compact = buildCompactStatus(snap, widgetStatus);
   if (compact) {
     ctx.ui.setStatus(STATUS_KEY, compact);
   } else {

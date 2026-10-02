@@ -13,11 +13,6 @@ const {
   patchSettings,
 } = await import("../extensions/lib/widget.ts");
 
-// `theme` stub: fg(color, text) -> `[color]text`
-const theme = {
-  fg: (color, text) => `[${color}]${text}`,
-};
-
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const MIN = 60_000;
@@ -76,7 +71,7 @@ describe("buildCompactStatus", () => {
   // 5 minutes before NOW.
   const FETCHED = new Date(2026, 8, 30, 15, 7).getTime();
 
-  it("joins periods in API order (session/weekly/monthly) with colored separator", () => {
+  it("joins periods in API order (session/weekly/monthly) with pink separators", () => {
     patchSettings({ pctYellow: 50, pctRed: 80 });
     const snap = snapOf(
       [
@@ -86,15 +81,16 @@ describe("buildCompactStatus", () => {
       ],
       FETCHED,
     );
+    const sep = hexFg(HEX_COLORS.pink, " | ");
     const expected =
       `${hexFg(HEX_COLORS.green, "1%")} ${hexFg(HEX_COLORS.purple, "4h38m")}` +
-      `${theme.fg("thinkingHigh", " | ")}` +
+      sep +
       `${hexFg(HEX_COLORS.green, "15%")} ${hexFg(HEX_COLORS.purple, "5d4h")}` +
-      `${theme.fg("thinkingHigh", " | ")}` +
+      sep +
       `${hexFg(HEX_COLORS.yellow, "54%")} ${hexFg(HEX_COLORS.purple, "23d4h")}` +
-      // trailing segment: separator + age of the last successful refresh, dim
-      `${theme.fg("thinkingHigh", " | ")}${theme.fg("dim", "5m ago")}`;
-    assert.equal(buildCompactStatus(snap, "ok", theme, NOW), expected);
+      // trailing segment: pink separator + pink age of the last refresh
+      `${sep}${hexFg(HEX_COLORS.pink, "5m ago")}`;
+    assert.equal(buildCompactStatus(snap, "ok", NOW), expected);
   });
 
   it("reports the refresh age across days without extra units", () => {
@@ -103,9 +99,9 @@ describe("buildCompactStatus", () => {
       new Date(2026, 8, 29, 23, 59).getTime(),
     );
     assert.equal(
-      buildCompactStatus(snap, "ok", theme, NOW),
+      buildCompactStatus(snap, "ok", NOW),
       `${hexFg(HEX_COLORS.green, "10%")} ${hexFg(HEX_COLORS.purple, "1h0m")}` +
-        `${theme.fg("thinkingHigh", " | ")}${theme.fg("dim", "15h13m ago")}`,
+        `${hexFg(HEX_COLORS.pink, " | ")}${hexFg(HEX_COLORS.pink, "15h13m ago")}`,
     );
   });
 
@@ -124,17 +120,17 @@ describe("buildCompactStatus", () => {
       new Date(2026, 8, 30, 15, 7).getTime(),
     );
     assert.equal(
-      buildCompactStatus(snap, "ok", theme, now),
+      buildCompactStatus(snap, "ok", now),
       `${hexFg(HEX_COLORS.green, "10%")}` +
-        `${theme.fg("thinkingHigh", " | ")}${theme.fg("dim", "5m ago")}`,
+        `${hexFg(HEX_COLORS.pink, " | ")}${hexFg(HEX_COLORS.pink, "5m ago")}`,
     );
   });
 
   it("shows placeholders for transient states and null when idle-empty", () => {
-    assert.equal(buildCompactStatus(null, "fetching", theme), hexFg(HEX_COLORS.purple, "…"));
-    assert.equal(buildCompactStatus(null, "failed", theme), hexFg(HEX_COLORS.red, "failed"));
-    assert.equal(buildCompactStatus(null, "none", theme), null);
-    assert.equal(buildCompactStatus(null, "ok", theme), null);
+    assert.equal(buildCompactStatus(null, "fetching"), hexFg(HEX_COLORS.purple, "…"));
+    assert.equal(buildCompactStatus(null, "failed"), hexFg(HEX_COLORS.red, "failed"));
+    assert.equal(buildCompactStatus(null, "none"), null);
+    assert.equal(buildCompactStatus(null, "ok"), null);
   });
 });
 
@@ -174,10 +170,11 @@ describe("extension status publication", () => {
       }
       const value = scene.statuses.get("ark-usage");
       assert.match(value, /1%.* \| .*15%.* \| .*54%/);
-      // separator went through theme.fg (mock renders as `[fg] | `)
-      assert.match(value, /\] \| /);
-      // trailing segment is the age of the last successful refresh
-      assert.match(value, /(just now|\d+[mhd]\w* ago)$/);
+      // separators use the pink model-name color (#D787AF = 215;135;175)
+      assert.match(value, /\x1B\[38;2;215;135;175m \| \x1B\[39m/);
+      // trailing segment is the age of the last successful refresh, in the
+      // pink used for the separators (#D787AF = 215;135;175)
+      assert.match(value, /\x1B\[38;2;215;135;175m(just now|\d+[mhd]\w* ago)\x1B\[39m$/);
     } finally {
       globalThis.fetch = originalFetch;
     }
