@@ -138,7 +138,7 @@ export function resetSettings(): Readonly<ArkSettings> {
 export const HEX_COLORS = {
   green: "#1FA87A",
   yellow: "#F09A3E",
-  red: "#EE7A5F",
+  red: "#FF0000",
   /** Reset countdowns, and the `…` placeholder for a fetch in flight. */
   purple: "#7A5FD0",
   /**

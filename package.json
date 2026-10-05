@@ -1,6 +1,6 @@
 {
   "name": "pi-ark-usage",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Show Volcengine Ark Coding Plan / Agent Plan usage in the pi TUI (AK/SK OpenAPI)",
   "keywords": [
     "pi",
